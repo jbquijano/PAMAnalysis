@@ -1,0 +1,118 @@
+---
+title: "Line graph of Fv/Fm results among different colonies"
+format: html
+theme: 
+  light: zephyr
+  dark: cyborg
+toc: true
+page-layout: full
+number-sections: true
+number-depth: 3
+editor: visual
+self-contained: true
+---
+
+# Import libraries
+
+You can import libraries however you like. I just vibe with `pacman`.
+
+```{r}
+pacman::p_load(tidyverse,
+               readxl, # Importing .xslx and other Excel-related data
+               lubridate, # Tidy-managing date data 
+               ggrepel)
+```
+
+# Import data
+
+As you've seen, I imported `tidyverse`. I love tidyverse, if you don't, it's fine, but you might not appreciate this documentation.
+
+```{r}
+path <- 'pam-reconciled_2023-2024.xlsx'
+data <- 
+  path |> 
+  excel_sheets() |> 
+  set_names() |> 
+  map(read_excel, path = path)
+```
+
+You might have noticed that the sheets are pooled into a list of dataframes. Separate them.
+
+```{r}
+iwalk(
+  .x = data,
+  .f = function(x, y) {
+    x <- as.data.frame(x)
+    y <- paste0('data_', y)
+    assign(y, x, envir = globalenv())
+    })
+```
+
+You now have different dataframes based on the name of your sheet.
+
+# Amil
+
+## Shape data
+
+```{r}
+data_amil <- 
+  `data_Amil-PAM` |> 
+  mutate(date_start = ymd(20231130),
+         Date = ymd(Date)) |>
+  mutate(days_exposure = Date - date_start,
+         treatment = case_when(`Tank ID` %in% c("C", "G") ~ '29',
+                               .default = '33')) |> 
+   mutate(days_exposure = as.numeric(days_exposure)) |> 
+  select(!c(10,11)) |> 
+  as_tibble() |> 
+  mutate(helper = paste0(`Fragment ID`, '_', days_exposure)) |> 
+  mutate(`Fv/Fm=Y` = case_when(helper == '06ME_7' ~ 0,
+                               .default = `Fv/Fm=Y`))
+```
+
+## Get top and bot 20% Fv/Fm (last day)
+
+```{r}
+data_amil_TopBot <- 
+  data_amil |> 
+  filter(treatment == '33',
+         days_exposure == 7)|> 
+  group_by(Colony) |> 
+  summarise('Fv/Fm=Y' = mean(`Fv/Fm=Y`)) |> 
+  arrange(desc(`Fv/Fm=Y`)) |> 
+  mutate(ranking = 1:n(),
+         heat_class = c(rep('High', 6),
+                        rep('Intermediate', 18),
+                        rep('Low', 6)))
+```
+
+## Plot
+
+```{r}
+data_amil_p <- 
+  data_amil |> 
+  filter(treatment == '33') |> 
+  left_join(data_amil_TopBot |> 
+              select(1,4), 
+            by = 'Colony') |> 
+  ggplot(aes(x = days_exposure,
+             y = `Fv/Fm=Y`,
+             group = Colony,
+             color = heat_class)) +
+  stat_summary(fun = mean,
+               geom="line")  +
+  theme_classic()
+
+data_amil_p <- 
+  data_amil |> 
+  filter(treatment == '33') |> 
+  left_join(data_amil_TopBot |> 
+              select(1,4), 
+            by = 'Colony') |> 
+  ggplot(aes(x = days_exposure,
+             y = `Fv/Fm=Y`,
+             group = Colony,
+             color = heat_class)) +
+  geom_smooth(method = 'lm', se = F)  +
+  theme_classic()
+```
