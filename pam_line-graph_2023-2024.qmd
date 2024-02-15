@@ -52,7 +52,7 @@ You now have different dataframes based on the name of your sheet.
 
 # Amil
 
-## Shape data
+Shape data.
 
 ```{r}
 data_amil <- 
@@ -70,7 +70,7 @@ data_amil <-
                                .default = `Fv/Fm=Y`))
 ```
 
-## Get top and bot 20% Fv/Fm (last day)
+Get top and bottom 20%.
 
 ```{r}
 data_amil_TopBot <- 
@@ -84,6 +84,9 @@ data_amil_TopBot <-
          heat_class = c(rep('High', 6),
                         rep('Intermediate', 18),
                         rep('Low', 6)))
+
+write_csv(data_amil_TopBot,
+          'amil_top-bot_average.csv')
 ```
 
 ## Plot
@@ -101,18 +104,21 @@ data_amil_p <-
              color = heat_class)) +
   stat_summary(fun = mean,
                geom="line")  +
-  theme_classic()
-
-data_amil_p <- 
-  data_amil |> 
-  filter(treatment == '33') |> 
-  left_join(data_amil_TopBot |> 
-              select(1,4), 
-            by = 'Colony') |> 
-  ggplot(aes(x = days_exposure,
-             y = `Fv/Fm=Y`,
-             group = Colony,
-             color = heat_class)) +
-  geom_smooth(method = 'lm', se = F)  +
+  labs(color = "Heat tolerance classification",
+       x = "Days exposure") +
+  scale_color_manual(values = c("red","gray","blue")) +
   theme_classic()
 ```
+
+## Export plot
+
+```{r}
+ggsave(plot = data_amil_p,
+       filename = "amil_line_ave.png", 
+       dpi = 900,
+       width = 4000, 
+       height = 4000, 
+       units = "px")
+```
+
+# Aten
