@@ -62,12 +62,12 @@ data_amil <-
   mutate(days_exposure = Date - date_start,
          treatment = case_when(`Tank ID` %in% c("C", "G") ~ '29',
                                .default = '33')) |> 
-   mutate(days_exposure = as.numeric(days_exposure)) |> 
+  mutate(days_exposure = as.numeric(days_exposure)) |> 
   select(!c(10,11)) |> 
   as_tibble() |> 
   mutate(helper = paste0(`Fragment ID`, '_', days_exposure)) |> 
-  mutate(`Fv/Fm=Y` = case_when(helper == '06ME_7' ~ 0,
-                               .default = `Fv/Fm=Y`))
+  mutate(`Fv/Fm=Y` = case_when(helper == '06ME_7' ~ 0, # Remove erroneous data point
+                               .default = `Fv/Fm=Y`)) 
 ```
 
 Get top and bottom 20%.
@@ -103,11 +103,16 @@ data_amil_p <-
              group = Colony,
              color = heat_class)) +
   stat_summary(fun = mean,
-               geom="line")  +
+               geom="line") +
   labs(color = "Heat tolerance classification",
-       x = "Days exposure") +
+       x = "Days of exposure") +
   scale_color_manual(values = c("red","gray","blue")) +
-  theme_classic()
+  theme_classic() +
+  theme(legend.background = element_rect(fill='transparent'),
+        legend.box.background = element_rect(fill='transparent', 
+                                             colour = 'transparent'),
+        panel.background = element_rect(fill='transparent'),
+        plot.background = element_rect(fill='transparent'))
 ```
 
 ## Export plot
@@ -122,3 +127,78 @@ ggsave(plot = data_amil_p,
 ```
 
 # Aten
+
+Shape data.
+
+```{r}
+data_aten <- 
+  `data_Aten-PAM` |> 
+  mutate(date_start = ymd(20231123),
+         Date = ymd(Date)) |> 
+  mutate(days_exposure = Date - date_start,
+         treatment = case_when(`Tank ID` %in% c("C", "G") ~ '29',
+                               .default = '33')) |> 
+  mutate(days_exposure = as.numeric(days_exposure)) |> 
+  select(!c(10,11)) |> 
+  as_tibble()
+```
+
+Get top and bottom 20%.
+
+```{r}
+data_aten_TopBot <- 
+  data_aten |> 
+  filter(treatment == '33',
+         days_exposure == 6) |>  # get last day measurements
+  type_convert() |> 
+  group_by(`Fragment ID`) |> 
+  summarise('Fv/Fm=Y' = mean(`Fv/Fm=Y`)) |> 
+  arrange(desc(`Fv/Fm=Y`)) |> 
+  mutate(ranking = 1:n(),
+         heat_class = c(rep('High', 6),
+                        rep('Intermediate', 18),
+                        rep('Low', 6)))
+
+write_csv(data_aten_TopBot,
+          'aten_top-bot_average.csv')
+```
+
+## Plot
+
+```{r}
+data_aten_p <- 
+  data_aten |> 
+  filter(treatment == '33') |> 
+  left_join(data_aten_TopBot |> 
+              select(1,4), 
+            by = 'Fragment ID') |> 
+  type_convert()|> 
+  ggplot(aes(x = days_exposure,
+             y = `Fv/Fm=Y`,
+             group = `Fragment ID`,
+             color = heat_class)) +
+  stat_summary(fun = mean,
+               geom="line") +
+  labs(color = "Heat tolerance classification",
+       x = "Days of exposure") +
+  scale_color_manual(values = c("red","gray","blue")) +
+  theme_classic() +
+  theme(legend.background = element_rect(fill='transparent'),
+        legend.box.background = element_rect(fill='transparent', 
+                                             colour = 'transparent'),
+        panel.background = element_rect(fill='transparent'),
+        plot.background = element_rect(fill='transparent'))
+
+
+```
+
+## Export plot
+
+```{r}
+ggsave(plot = data_aten_p,
+       filename = "aten_line_ave.png", 
+       dpi = 900,
+       width = 4000, 
+       height = 4000, 
+       units = "px")
+```
